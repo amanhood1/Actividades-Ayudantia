@@ -1,0 +1,84 @@
+---
+title: " Ayudantia 2"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Actividad Ayudantia 2
+  Replicar lo realizado en la ayudantia (analisis exploratorio de los datos, limpieza, sub dataframes, filtro y graficar ), pueden         elegir otro equipo para que puedan explorar otros datos
+
+
+## Analisis Exploratorio de Datos 
+
+```{r cargar datos}
+library(quanteda)
+library(dplyr)
+library(tidyverse)
+library(utf8)
+library(ggplot2)
+setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad2")
+primer_tiempo2020 <- read_csv("Primer_Tiempo2020.csv", col_names = TRUE)
+#str(primer_tiempo2020)
+#attach(primer_tiempo2020)
+summary(primer_tiempo2020)
+```
+
+## Borrar Datos Char
+```{r}
+primer_tiempo2020
+primer_tiempo2020 <- primer_tiempo2020[,!(colnames(primer_tiempo2020) %in% c("id_partido", "fasepartido", "local", "tiempo","formationUsed", "torneo"))]
+primer_tiempo2020
+```
+
+## Analisis descriptivo
+
+```{r}
+fh2020 <- primer_tiempo2020[order(primer_tiempo2020$accuratePass, decreasing = TRUE),]
+fh2020
+```
+## Sub DataFrames
+
+```{r}
+fh2020_pases = fh2020[,colnames(primer_tiempo2020) %in% c("equipo", "partido", "accuratePass", "totalPass", "precision_pases")]
+fh2020_pases = fh2020_pases[order(fh2020_pases$precision_pases, decreasing = TRUE),]
+fh2020_pases
+fh2020_tiros <- NULL
+fh2020_tiros = fh2020[,colnames(primer_tiempo2020) %in% c("equipo", "partido", "goals", "ontargetScoringAtt", "totalScoringAtt", "blockedScoringAtt", "shotOffTarget", "precision_tiros")]
+fh2020_tiros = fh2020_tiros[order(fh2020_tiros$goals, decreasing = TRUE),]
+fh2020_tiros
+```
+
+## Filtrar Datos
+```{r}
+everton <- filter(primer_tiempo2020, equipo == "Everton")
+everton_tiros <- filter(fh2020_tiros, equipo == "Everton")
+everton_pases <- filter(fh2020_pases, equipo == "Everton")
+```
+
+## Agregar Promedio/Suma Total/Min/...
+```{r}
+everton_pases <- everton_pases[,!(colnames(everton_pases) %in% c("equipo"))] 
+Promedios_Pas <- c("Promedio Pases",mean(everton_pases$accuratePass),mean(everton_pases$totalPass),mean(everton_pases$precision_pases))
+everton_pases <- rbind(everton_pases, Promedios_Pas)
+Max_Pas <- c("Max Pases",max(everton_pases$accuratePass),max(everton_pases$totalPass),max(everton_pases$precision_pases))
+everton_pases <- rbind(everton_pases, Max_Pas)
+Min_Pas <- c("Min Pases",min(everton_pases$accuratePass),min(everton_pases$totalPass),min(everton_pases$precision_pases))
+everton_pases <- rbind(everton_pases, Min_Pas)
+everton_pases
+```
+
+## Graficos
+```{r}
+pases_eve <- everton$accuratePass
+everton2 <- everton[order(everton$accuratePass, decreasing = FALSE),]
+#dotchart(everton$totalPass, labels = everton$partido, cex=0.5, xlab = "Pases", ylab = "Partido")
+dotchart(everton$totalPass, labels = utf8_encode(everton$partido), cex=0.5, xlab = "Pases", ylab = "Partido")
+dotchart(everton$accuratePass, labels = utf8_encode(everton$partido), cex=0.5, xlab = "Pases", ylab = "Partido")
+dotchart(everton2$totalPass, labels = utf8_encode(everton$partido), cex=0.5, xlab = "Pases", ylab = "Partido")
+dotchart(everton2$totalPass, labels = utf8_encode(everton$partido), main="Pases Acertados everton", pch = 16, col=c("darkblue","dodgerblue"),lcolor="gray90", cex=0.8, xlab = "Pases", ylab = "Partido", cex.main=2,cex.lab=1.5)
+```
+
+`
