@@ -9,6 +9,11 @@ equipo para que puedan explorar otros datos
 
 ## Analisis Exploratorio de Datos
 
+El objetivo de esta parte es primero cargar la base de datos de futbol.
+Para luego generar un resumen de esta, revisar las diferentes tablas,
+sacar los datos que no tienen información y finalmente determinar que
+atributos nos interesan.
+
 ``` r
 library(quanteda)
 ```
@@ -172,6 +177,11 @@ summary(primer_tiempo2020)
 
 ## Borrar Datos Char
 
+En esta parte se procede con eliminar columnas que no nos sirven para
+nuestro trabajo, ya que al hacer esto podremos concentrarnos en las
+variables que son de interés para esta actividad y así trabajar en ellas
+de manera mas ordenada.
+
 ``` r
 primer_tiempo2020
 ```
@@ -237,6 +247,9 @@ primer_tiempo2020
 
 ## Analisis descriptivo
 
+En esta parte es guardan en orden descendente la precision de los pases
+de los diferentes equipos presentes en la base de datos.
+
 ``` r
 fh2020 <- primer_tiempo2020[order(primer_tiempo2020$accuratePass, decreasing = TRUE),]
 fh2020
@@ -269,6 +282,10 @@ fh2020
     ## #   foulsInofensivos <dbl>, cortarJuegoContrario <dbl>, juegoCortado <dbl>
 
 ## Sub DataFrames
+
+Ahora lo que se realiza es crear una nueva variable para de esta manera
+ordenar los datos de interés y tener las variables mas ordenadas.
+Posteriormente se re ordenan estos datos.
 
 ``` r
 fh2020_pases = fh2020[,colnames(primer_tiempo2020) %in% c("equipo", "partido", "accuratePass", "totalPass", "precision_pases")]
@@ -316,6 +333,11 @@ fh2020_tiros
 
 ## Filtrar Datos
 
+En esta parte se filtran los datos de acuerdo al equipo de interes, el
+cual es Everton de Viña del Mar. Se guardan las estadisticas respectos
+de tiros, pases y sobre su rendimiento en el primer tiempo del torneo
+nacional pasado.
+
 ``` r
 everton <- filter(primer_tiempo2020, equipo == "Everton")
 everton_tiros <- filter(fh2020_tiros, equipo == "Everton")
@@ -323,6 +345,9 @@ everton_pases <- filter(fh2020_pases, equipo == "Everton")
 ```
 
 ## Agregar Promedio/Suma Total/Min/…
+
+En esta parte se sacan medidas descriptivas respecto del rendimiento del
+equipo en analisis.
 
 ``` r
 everton_pases <- everton_pases[,!(colnames(everton_pases) %in% c("equipo"))] 
@@ -351,6 +376,14 @@ everton_pases
     ## 11 Min Pases                            106          136       66.1764705882353
 
 ## Graficos
+
+Finalmente se procede a graficar las variables de interés para saber el
+comportamiento del equipo en términos de pases y precisión de estos.
+
+En donde se puede desprender que a medida que el nivel del equipo rival
+aumenta (esto se sabe producto de que tengo algo de conocimiento de
+futbol) la precisión de los pases disminuye, ya sea por factores que hay
+una mejor defensa, entre otros.
 
 ``` r
 pases_eve <- everton$accuratePass
