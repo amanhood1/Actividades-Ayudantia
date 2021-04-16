@@ -1,0 +1,50 @@
+---
+title: "Actividad 3"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Actividad Ayudantia 3: Replicar el analisis de outliers, debes elegir uno de los dos csv disponibles (pokemon o titanic) y realizar el analisis con algunas     de las variables numericas y realizar un pequeño analisis en relacion a los datos encontrados como outliers (en caso de que eligas     el csv del titanic solo debes evaluar las columnas AGE y FNLWGT)
+
+```{r}
+library(dplyr)
+wd = setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad3")
+pk = read.csv("pokemon.csv")
+pk
+#pk123 = filter(pk, pk$Generation %in% c(1, 2, 3))
+#pk123
+attach(pk)
+hp = boxplot(HP, horizontal = TRUE)
+stats_hp = boxplot.stats(HP)
+hp
+stats_hp
+```
+
+```{r}
+pk1 <- HP[HP < 125 & HP > 15]
+length(HP) - length(pk1)
+boxplot(pk1, horizontal = TRUE)
+hp_out <- filter(pk, pk$HP > 20)
+hp_out
+```
+
+```{r}
+def = boxplot(Defense, horizontal = TRUE)
+stats_def = boxplot.stats(Defense)
+def
+stats_def
+pk2 <- Defense[Defense < 160]
+length(Defense) - length(pk2)
+boxplot(pk2, horizontal = TRUE)
+def_out <- filter(pk, pk$Defense > 159 )
+def_out
+```
+## Lo que se puede desprender de este análisis es que los valores de HP (HitPoints) se mueven entre valores de 25 y 80, lo cual se relaciona por la cantidad de daño que puede recibir un pokemon, ya que esta es su "vida".
+
+## Luego tenemos el caso del nivel de defensa de los pokemones, el cual se relaciona con la capacidad del pokemon atacado de dismiuir los hitpoint (hp) recibidos.
+
+## Finalmente, lo que se puede sacar en análisis de esta situación es que la defensa cambia la cantidad de daño causado por un ataque. Por lo tanto, un pokemon con muy poca defensa perdería mucho HP por un ataque, pero con una defensa más alta, el mismo ataque daría como resultado una menor pérdida de HP. Para ser un tanque como Blissey, necesitas un alto HP y defensa.
+
+
