@@ -1,0 +1,222 @@
+---
+title: "Tarea 5 Minería de Datos"
+output: github_document
+---
+## Alumno: Alejandro Manhood
+
+## Actividad 5:
+Realizar análisis de agrupamiento (K-means, incluye preprocesamiento de los datos) e índices de evaluación para el archivo “sandwiches.csv” tomando las columnas de nota y precio. Hacer análisis para diferentes K y / o medidas de distancia para que vean cómo se comporta el clustering (En caso de tener algún problema con ese csv, pueden utilizar el csv de Pokémon también para la actividad)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Cargar datos y librerias
+Como bien sabemos, lo primero que debemos hacer es cargar los datos a nuestro R, en conjunto con las librerias. De esta manera será posible usar la data para los propósitos de la actividad.
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(stringr)
+library(readr)
+library(datasets)
+library(cluster)
+library(factoextra)
+setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad5")
+datos  <- read.csv("sanguchez.csv",sep=";")
+head(datos)
+```
+
+# Borrar datos
+Como solo utilizaremos dos columnas, borraremos todas las demas para trabajar de manera más ordenada, y así visualizar únicamente la data que nos interesa. Además, procederemos a eliminar los datos que no están presentes, ya que estos no aportan al desarrollo de la actividad.
+```{r}
+datos <- datos[,! (colnames(datos) %in% c("url","Local","Direccion","Ingredientes","texto"))]
+datos <- na.omit(datos)
+head(datos)
+```
+
+# Misma clase de datos
+Para poder hacer una correcta comparación, necesitamos que en la base de datos solo exista un tipo de datos, y el precio es un caracter, ya que posee "$", puntos y comas. Por ende, lo que es necesario hacer, es eliminar de esta columna todos los caractéres que no sean numéricos y luego transformar esta varibale a númerica.
+```{r}
+datos$Precio <- as.numeric(gsub('[$.]', '', datos$Precio))
+head(datos)
+```
+
+A continuación se procede a hacer un resumen de la data, y de esta manera observar en que estado quedo luego de limpiarla.
+
+```{r}
+datos <- datos[complete.cases(datos), ]
+summary(datos)
+```
+
+# Boxplot´s
+Usaremos estas imagenes como primera aproximacion para realizar el analisis. Ya que de esta manera podremos identificar datos que sean atípicos, para ser más precisos en nuestros resultados.
+```{r}
+pre=boxplot(datos$Precio, horizontal =TRUE)
+stats_pre = boxplot.stats(datos$precio)
+pre
+stats_pre
+```
+
+Una vez visualizado el gráfico, se procede por medio de inspección visual a filtrar los datos y dejar unicamente aquellos precios que esten en el rango que no hay atipicos. Es decir, mayores a 2000 y menor a 10500.
+
+```{r}
+datos<-filter(datos, Precio <10500 & Precio > 2000)
+boxplot(datos$Precio, horizontal = TRUE)
+```
+
+Luego viene el turno de realizar el mismo análisis de antes, pero con la nota de los sanguchez. 
+
+```{r}
+not=boxplot(datos$nota, horizontal =TRUE)
+stats_not = boxplot.stats(datos$nota)
+not
+stats_not
+```
+
+Se visualiza que hay datos atipicos, y por ende se expresa que las notas que deben estar en la data deben ser mayores a 1. Una vez realizado esto no se contaran con datos atípicos y se comenzará con el desarrollo de las herramientas de clusters.
+
+```{r}
+datos<-filter(datos, nota>1)
+boxplot(datos$nota, horizontal = TRUE)
+```
+
+
+# Escalar datos
+
+Ahora se procede a primero realizar una escalada de la data, y posteriormente un resumen para visualiar como quedo esta, luego de lo anterior. Al realizar esta escalación, es posible tener gráficos más pequeños y que sean más simples de visualizar por lo mismo.
+
+```{r}
+escala_d  = scale(datos)%>%as_tibble ()
+escala_d %>% summary()
+```
+
+## Cluster 
+
+# Cluster K = 10
+
+Se comienza primero con un k igual a 10, el cual viene en R base, y de esta manera ver como estan distribuidos los datos.
+
+```{r}
+modelo_kmeans <- kmeans(escala_d, centers = 10)
+modelo_kmeans2 <- kmeans(datos, centers = 10)
+escala_d$clus <- modelo_kmeans$cluster %>% as.factor()
+datos$clus <- modelo_kmeans2$cluster %>% as.factor()
+ggplot(escala_d, aes(Precio, nota, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+```
+# Evolución suma de cuadrados intra-cluster en la medida que aumentamos el numero de k
+
+En este punto lo que se quiere hacer es visulizar cual seria el k óptimo para hacer nuestros clusters. Se puede apreciar, por medio de inspección visual, que existe un quibre entre el 4 y el 11. De esta manera se puede empezar a pensar respecto del k ideal.
+
+```{r}
+SSinterior <- numeric(30)
+for(k in 1:30){
+  modelo <- kmeans(escala_d, centers = k)
+  SSinterior[k] <- modelo$tot.withinss
+}
+plot(SSinterior)
+```
+##EVALUACIÓN
+
+#Inspeccion visual
+```{r}
+escala_d$clus <- as.numeric(escala_d$clus)
+datos$clus <- as.numeric(datos$clus)
+# uso distancia euclidiana
+tempDist <- dist(escala_d) %>% as.matrix()
+#reordeno filas y columnas en base al cluster obtenido
+index <- sort(modelo_kmeans$cluster, index.return=TRUE)
+tempDist <- tempDist[index$ix,index$ix]
+rownames(tempDist) <- c(1:nrow(escala_d))
+colnames(tempDist) <- c(1:nrow(escala_d))
+image(tempDist)
+```
+Se puede apreciar que quizas existen clusters dentro de nuestros clusters. Por ende, se procederá a calcular el estadístico de Hopkins.
+
+# Estadístico de Hopkins
+
+```{r}
+res <- get_clust_tendency(escala_d, n = 30, graph = FALSE)
+res2 <- get_clust_tendency(datos, n = 30, graph = FALSE)
+print(res)
+print(res2)
+```
+
+Se aprecia que existe una diferencia de 10%, por ende se utilizará la data escalada.
+
+# Indice de correlación
+
+A continuación, se realiza el análisis de correlacion para ver como esta entre nuestras varibales. Se obtiene un valor elevado, y por ende se puede inferir que de cierta manera se relaciona la nota con el precio del sandwich.
+
+```{r coef correlacion}
+#Correlation
+#construyo matriz de correlacion ideal (cada entidad correlaciona 1 con su cluster)
+tempMatrix <- matrix(0, nrow = nrow(escala_d), ncol = nrow(escala_d))
+tempMatrix[which(index$x==1), which(index$x==1)]  <- 1
+tempMatrix[which(index$x==2), which(index$x==2)]  <- 1
+tempMatrix[which(index$x==3), which(index$x==3)]  <- 1
+tempMatrix[which(index$x==4), which(index$x==4)]  <- 1
+tempMatrix[which(index$x==5), which(index$x==5)]  <- 1
+tempMatrix[which(index$x==6), which(index$x==6)]  <- 1
+tempMatrix[which(index$x==7), which(index$x==7)]  <- 1
+tempMatrix[which(index$x==8), which(index$x==8)]  <- 1
+tempMatrix[which(index$x==9), which(index$x==9)]  <- 1
+tempMatrix[which(index$x==10), which(index$x==10)] <- 1
+#construyo matriz de disimilitud
+tempDist2 <- 1/(1+tempDist)
+#Calcula correlacion 
+cor <- cor(tempMatrix[upper.tri(tempMatrix)],tempDist2[upper.tri(tempDist2)])
+print(cor)
+```
+
+# Indice de cohesión y el de separación.
+
+```{r coef cohesion y separacion}
+library(flexclust) # usaremos la distancia implementada en flexclus (dist2) que maneja mejor objetos de diferente tamaño
+#escal_data_pok <- apply(escal_data_pok,2,as.numeric)
+ 
+#Cohesion
+withinCluster <- numeric(10)
+for (i in 1:10){
+  tempdata_san <- escala_d[which(modelo_kmeans$cluster == i),]
+  withinCluster[i] <- sum(dist2(tempdata_san,colMeans(tempdata_san))^2)
+}
+cohesion = sum(withinCluster)
+#es equivalente a model$tot.withinss en k-means
+print(c(cohesion, modelo_kmeans$tot.withinss))
+#Separation
+meandata_san <- colMeans(escala_d)
+SSB <- numeric(10)
+for (i in 1:10){
+  tempdata_san <- escala_d[which(modelo_kmeans$cluster==i),]
+  SSB[i] <- nrow(tempdata_san)*sum((meandata_san-colMeans(tempdata_san))^2)
+}
+separation = sum(SSB)
+print(separation)
+```
+De esto se puede desprender que nuestros grupos se separan entre si, y que los datos no están tan cohesionados entre si.
+
+# Coeficiente de silueta
+```{r}
+coefSil <- silhouette(modelo_kmeans$cluster,dist(escala_d))
+summary(coefSil)
+fviz_silhouette(coefSil)+coord_flip()
+```
+
+Utilizamos el coeficiente de silueta para encontrar el mejor valor de K. 
+
+```{r}
+coefSil=numeric(30)
+for (k in 2:30){
+  modelo <- kmeans(escala_d, centers = k)
+  temp <- silhouette(modelo$cluster,dist(escala_d))
+  coefSil[k] <- mean(temp[,3])
+}
+tempDF=data.frame(CS=coefSil,K=c(1:30))
+ggplot(tempDF, aes(x=K, y=CS)) + 
+  geom_line() +
+  scale_x_continuous(breaks=c(1:30))
+```
