@@ -1,0 +1,406 @@
+---
+title: "Actividad Ayudantía 6"
+output: github_document
+---
+
+# Actividad de Ayudantia 6
+
+Para la actividad de esta semana deberan generar un sample (subconjunto al azar de los datos de spotify)  de la data del proyecto 2 (de unas 10.000 observaciones para que sea parecido a lo trabajado aqui) (consideren que esta tarea les puede ser de gran ayuda para cuando tengan que hacer el proyecto 2) y realizar el analisis de clustering jerarquico (exploren los distintos tipos de distancia, metodos que se pueden utilizar para hacer clustering jerarquico, probar cortar el arbol para distintos h, distintos k, y va variando la cantidad de cluster segun el h que eligan, caracterizar los clusters que encuentren).
+
+## Cargar Datos Actividad
+
+- Dado el formato con el que estan subidos los datos, para cargar los datos debemos ir a Session, luego a Load Workspace y seleccionamos el archivo .RData que subio el profe
+
+# Actividad 6: Base de Datos Proyecto 2
+
+## Carga de Librerías
+
+Se añaden a nuestro código las librerías a utilizar para los análisis que realizaremos.
+
+```{r cargar librerias}
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(janitor)
+
+setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad6")
+datos <- read.csv("spotify.csv",header= TRUE, sep="")
+
+```
+
+## Selección temprana de data:
+
+En esta actividad se realizará tempranamente una selección de datos, la cuál consistirá en una muestra de 10.000,
+para que de esta manera sea más sencillo y no tener que utilizar la data completa, que son casi 500.000 observaciones.
+
+```{r}
+sample_spotify <- datos %>% slice_sample(n=10000)
+```
+
+Luego de esto se procede con hacer un summary y ver los head de nuestra data, para así tener una idea de con que se trabaja.
+
+```{r}
+summary(sample_spotify)
+```
+
+
+# Pre Procesamiento de los Datos
+
+## Limpieza de los Datos
+
+### Observaciones que tengan datos faltantes
+
+Se realizará un proceso que será extenso, ya que se tienen que identificar y borrar las observaciones en las que hayan datos faltantes.
+
+Luego se debe realizar un filtrado para remover todos los datos que sean repetidos, y esto en para la varibale que contiene el nombre de las canciones.
+
+Primero comenzamos con asignarle a todos los datos faltantes el valor de NA
+
+```{r limpieza na}
+sample_spotify[sample_spotify == ""] <- NA
+```
+
+Verificamos donde hay valores NAs
+
+```{r}
+sample_spotify %>% 
+  summarise_all(funs(sum(is.na(.))))
+```
+
+De existir eliminamos todas las observaciones que presenten estos datos, para así limpiar nuestra data.
+
+```{r}
+data_pre <- sample_spotify %>% 
+  filter(!(is.na(track_preview_url)|is.na(album_release_year)))
+```
+
+De esta manera eliminamos 3830 datos que no tenian valores asignados, y así se pudo reducir el tamaño de nuestra data para trabajar. A continuación, corroboramos que ya no queden datos que sean NA.
+  
+Corroboramos que no queden datos NA, para saber si es que no es necesario agregar otra variable para este objetivo.
+
+```{r}
+data_pre %>% 
+  summarise_all(funs(sum(is.na(.))))
+```
+
+
+En segundo lugar, viene la parte la eliminación de datos que se encuentren duplicados, y esto es en específico para el nombre de las canciones.
+```{r limpieza duplicados}
+data_pre <- data_pre[!duplicated(data_pre$track_id),]
+
+```
+
+No se consigno en el código para el knit, pero al momento de mostrar en pantalla cuantas observaciones teniamos luego de eliminar las duplciadas, verificamos que se sacaron 2.
+
+### Observaciones que tengan datos duplicados de otras
+
+Ahora corroboraremos si existen canciones que esten duplicadas.
+
+```{r}
+data_pre %>% count(duplicated(data_pre$track_name))
+```
+
+ 
+Poder apreciar que existen canciones repetidas, por lo tanto realizamos la consulta para obtener los valores distintos, pero este hecho obvia que hayan canciones con el mismo nombre pero de distinto artistas.
+
+```{r}
+data_pre %>% distinct(track_name, .keep_all = TRUE, ) %>% head()
+```
+
+Por lo que creamos una variables que almacene si existe duplicidad en la cacion y/o en el artista.
+
+```{r}
+data_pre$duplicate <- duplicated(data_pre[,c("track_name", "artist_name")])
+```
+
+Generamos un sub data frame que almacenara solo los valores que haya obtenido el valor TRUE a la consulta anterior.
+
+```{r}
+data_dupli <- data_pre %>% 
+  filter(data_pre$duplicate == TRUE) 
+```
+
+Seleciono las filas que sean distintas y borro todas las canciones que se repiten.
+
+```{r}
+data_dupli <- data_dupli %>% 
+  distinct(track_name, artist_name, .keep_all = TRUE)
+```
+  
+Elimino de mi data pre procesada los datos que dieron positivo a la duplicidad, para que al momento de re insertar los datos sobrevivieron a la limpieza de duplicidad no se genere la duplicidad que se estaba evitando
+```{r}
+data_pre <- data_pre[!(data_pre$duplicate == TRUE),]
+```
+
+Junto la data pre procesada con los datos que sobrevivieron a la limpieza de duplicidad
+
+```{r}
+data_pre <- rbind(data_pre, data_dupli)
+```
+
+Elimino la columna que me indicaba duplicidad ya que no sera util mas adelante
+
+```{r}
+data_pre$duplicate <- NULL
+summary(data_pre)
+head(data_pre)
+```
+
+## Revisión de la estructura de los datos
+
+Transformamos cada variables al tipo de variable que sale en el archivo .txt con el tipo de dato que le corresponde. Para de esta manera no tener algun problema, debido a que alguna variable se encuentre en otro tipo de dato, y que debido a eso no pueda realizar el análisis.
+
+```{r}
+data_pre$artist_name <- as.character(data_pre$artist_name)
+data_pre$artist_id <- as.character(data_pre$artist_id)
+data_pre$album_id <- as.character(data_pre$album_id)
+data_pre$album_type <- as.character(data_pre$album_type)
+data_pre$album_release_date <-  as.character(data_pre$album_release_date)
+data_pre$album_release_date_precision <- as.character(data_pre$album_release_date_precision)
+data_pre$track_id <- as.character(data_pre$track_id)
+data_pre$analysis_url <- as.character(data_pre$analysis_url)
+data_pre$track_href <- as.character(data_pre$track_href)
+data_pre$track_name <- as.character(data_pre$track_name)
+data_pre$track_preview_url <- as.character(data_pre$track_preview_url)
+data_pre$type <- as.character(data_pre$type)
+data_pre$track_uri <- as.character(data_pre$track_uri)
+data_pre$external_urls.spotify <- as.character(data_pre$external_urls.spotify)
+data_pre$album_name <- as.character(data_pre$album_name)
+data_pre$key_name <- as.character(data_pre$key_name)
+data_pre$mode_name <- as.character(data_pre$mode_name)
+data_pre$key_mode <- as.character(data_pre$key_mode)
+
+data_pre$key <- as.double(as.character(data_pre$key))
+data_pre$track_number <- as.double(as.character(data_pre$track_number))
+data_pre$time_signature <- as.double(as.character(data_pre$time_signature))
+data_pre$disc_number <- as.double(as.character(data_pre$disc_number))
+data_pre$duration_ms <- as.double(as.character(data_pre$duration_ms))
+data_pre$album_release_year <- as.double(as.character(data_pre$album_release_year))
+data_pre$danceability <- as.double(as.character(data_pre$danceability))
+data_pre$energy <- as.double(as.character(data_pre$energy))
+data_pre$loudness <- as.double(as.character(data_pre$loudness))
+data_pre$mode <- as.double(as.character(data_pre$mode))
+data_pre$speechiness <- as.double(as.character(data_pre$speechiness)) 
+data_pre$acousticness <- as.double(as.character(data_pre$acousticness))
+data_pre$instrumentalness <- as.double(as.character(data_pre$instrumentalness))
+data_pre$liveness <- as.double(as.character(data_pre$liveness))
+data_pre$valence <- as.double(as.character(data_pre$valence))
+data_pre$tempo <- as.double(as.character(data_pre$tempo))
+```
+
+Transformacion de milisegundos a minutos, para que de esta manera tenga sentido al momento de realizar los escalamientos y los análisis.
+
+```{r}
+data_pre <- data_pre %>% mutate(duration_min = data_pre$duration_ms/60000)
+```
+
+Creo ahora una variable para las variables de tipo: Character. De esta manera puedo tener un mejor orden de como pienso disponer las cosas.
+```{r}
+data_char <- c("artist_name", "artist_id", "album_id", "album_type", "album_release_date",	"album_release_date_precision", "track_id", "analysis_url", "track_href", "track_name", "track_preview_url", "type", "track_uri", "external_urls.spotify", "album_name", "key_name", "mode_name", "key_mode")
+```
+
+
+Creo ahora una variable para las variables de tipo: Double. De esta manera puedo tener un mejor orden de como pienso disponer las cosas.
+```{r}
+data_dou <- c("key", "track_number", "time_signature", "disc_number", "duration_ms", "album_release_year", "danceability", "energy", "loudness", "mode", "speechiness",	"acousticness",	"instrumentalness", "liveness",	"valence", "tempo") 
+```
+			
+Separo Datos
+
+```{r}
+datanum <- data_pre %>% 
+  select(data_dou)
+
+datachar <- data_pre %>% 
+  select(data_char)
+```
+
+Y finalmente procedo a escalar la data que es númerica para trabajar con ella. Y así poder generar gráficos y otros calculos con esta.
+
+```{r}
+data_sca <- sapply(datanum, scale)
+```
+
+# Procesamiento de los Datos
+
+En este punto comenzaremos con el procesamiento de datos para poder visualizar todo lo que se nos pide en la actividad.
+
+## Clustering Jerarquico
+
+En esta primera parte, se realizaran tres matrices de distancias. Estas son Euclideana, Manhattan y Minkowski
+
+-- Distancia Euclideana
+```{r}
+d = dist(data_sca, method = "euclidean")
+```
+
+-- Distancia Manhattan
+```{r}
+d1 = dist(data_sca, method = "manhattan")
+```
+
+-- Distancia Minkowski
+```{r}
+d2 = dist(data_sca, method = "minkowski")
+``` 			
+
+Una vez calculadas estas distancias se procede a realizar histogramas para poder ver como es la distribución de las variables.
+
+```{r}
+hist(d, main = "Histograma Distancia Euclideana")
+hist(d1, main = "Histograma Distancia Manhattan")
+hist(d2, main = "Histograma Distancia Minkowski")
+```
+
+### Clustering Aglomerativo 
+               		 
+Utilizando la funcion de R base hclust, aplicamos hierarchical clustering, a partir de la matriz de distancias d, y utilizamos el criterio complete linkage
+
+- Complete Model
+```{r complete model}
+# Fijamos una seed para que cada vez que ejecutemos el codigo obtengamos los mismos valores y no vayan cambiado cada vez que ejecutamos el script
+set.seed(369)
+model_complete <- hclust(d, method = "complete")
+summary(model_complete)
+```
+
+- Ward Model
+```{r ward model}
+set.seed(369)
+model_ward <- hclust(d, method = "ward.D")
+summary(model_ward)
+```
+
+Intente hacer los analisis de agnes y etc. Pero no quize seguir porque mi computador ya llevaba un buen rato calculando las cosas, por ende continue con lo demás.
+
+
+Generamos un dendrograma para visualizar la jerarquia. La libreria 'ggdendro' permite hacer estos diagramas en una sintaxis equivalente a ggplot. 
+
+```{r grafico dendrograma}
+library("ggdendro")
+ggdendrogram(model_complete, rotate = TRUE, theme_dendro = TRUE) 
+``` 			
+              		     
+## Cortes del árbol
+
+El siguiente paso es ver el tema de los grupos, para estoy hay dos formas de dividir el árbol. Puede ser mediante la altura que se desea cortar, o la cantidad de grupos que se desean.
+
+Es decir, se determina un valor de h, lo que nos entregará un valor distinto de k para cada altura que escojamos. Y también es posible definir el k, de los grupos desde un principio.
+ 			
+Adicionalmente, se realiza una limpieza para sacar los datos que son NA de la variable album_release_year.
+
+```{r corte arbol}
+
+
+groups <- cutree(model_complete, h = 9)
+# Se imprimen los tamaños de cada cluster
+table(groups)
+# Generamos una nueva columna para almacenar a que cluster pertenece cada observacion (tanto en data_pre y datanum)
+data_pre$clust <- as.factor(groups)
+datanum$clust <- as.factor(groups)
+# Graficamos las observaciones agrupadas por su cluster
+fviz_cluster(list(data = data_sca, cluster = groups))
+```        	            
+          		    
+ 			
+## Caracteristicas de los clusters encontrados
+```{r caracteristicas clusters}
+datanum$clust <- as.numeric(as.character(datanum$clust))
+# Generamos una tabla que almacenara los valores promedios para cada uno de los clusters encontrados lo que nos permitira caracterizar a cada uno de ellos
+infoclusters <- aggregate(datanum, by=list(cluster=datanum$clust), mean)
+# Borramos la columna clust ya que se repite esa informacion en la tabla generada
+infoclusters$clust <- NULL
+# Transformamos el tiempo de la cancion a minutos
+infoclusters <- infoclusters %>% mutate(duration_min = infoclusters$duration_ms/60000)
+# Borramos la columna de la duracion en milisegundoss
+infoclusters$duration_ms <- NULL
+infoclusters
+```
+
+
+## Filtremos por clusters con mas datos
+```{r filtrar clusters}
+# 1er Cluster con mas datos
+data_c1 <- data_pre %>% 
+  filter(data_pre$clust == 1)
+# 2do Cluster con mas datos
+data_c2 <- data_pre %>% 
+  filter(data_pre$clust == 4)
+# 3er Cluster con mas datos
+data_c3 <- data_pre %>% 
+  filter(data_pre$clust == 2)
+```
+
+
+## Tomemos a c2
+```{r cluster_dos}
+# Borramos la columna clust para escalar la datanum de c2
+data_c2$clust <- NULL
+# Selecciono las variables numericas, se escalan las variables y se almacenan los datos en una tabla
+datanumc2 <- data_c2 %>% 
+  select(data_dou) %>% 
+  scale() %>% 
+  as_tibble()
+
+```
+
+## Clustering Divisivo
+```{r clustering divisivo}
+# Generamos un modelo divisvo mediante la funcion diana de clusters
+modelo_div <- diana(datanumc2)
+# Le pedimos el coeficiente de divisivilidad al modelo
+modelo_div$dc
+# Graficamos nuestro dendrograma divisivo
+pltree(modelo_div, cex = 0.8, hang = -1.5, main = "Dendrogram of diana")
+```
+
+```{r}
+#datanumc2[datanumc2 == ""] <- NA
+#datanumc2 <- datanumc2 %>% 
+  #filter(!(is.na(disc_number)))
+# Corroboramos que no queden datos NA
+datanumc2 <- datanumc2[,! (colnames(datanumc2) %in% c("disc_number"))]
+```
+
+
+
+## Cantidad Clusters
+
+Me surgio un error en esta parte, ya no pude saber porque fue, limpie la data en varias veces. Pero de todas maneras, derrepente funciona, debe ser alguna maña de R.
+
+```{r division arbol}
+# Para el caso divisivo le entregaremos el numero de clusters con los que queremos agrupar nuestros datos
+
+groupsc2 <- cutree(modelo_div, k = 10)
+
+# Se imprimen los tamaños de cada cluster
+
+table(groupsc2)
+
+# Generamos una nueva columna para almacenar a que cluster pertenece cada observacion de data_c2
+
+data_c2$clust <- as.factor(groupsc2)
+
+# Graficamos las observaciones agrupadas por su cluster
+
+fviz_cluster(list(data = datanumc2, cluster = groupsc2))
+
+# Generamos una nueva columna para almacenar a que cluster pertenece cada observacion de datanumc2
+
+datanumc2$clust <- as.factor(groupsc2)
+```
+
+## Caracteristicas Clusters encontrados
+```{r caracteristicas cluster dos}
+datanumc2$clust <- as.numeric(as.character(datanumc2$clust))
+# Generamos una tabla que almacenara los valores promedios para cada uno de los clusters encontrados lo que nos permitira caracterizar a cada uno de ellos
+infoclustersc2 <- aggregate(datanumc2, by=list(cluster=datanumc2$clust), mean)
+# Borramos la columna clust ya que se repite esa informacion en la tabla generada
+infoclustersc2$clust <- NULL
+# Transformamos el tiempo de la cancion a minutos
+infoclustersc2 <- infoclustersc2 %>% mutate(duration_min = infoclustersc2$duration_ms/60000)
+# Borramos la columna de la duracion en milisegundoss
+infoclustersc2$duration_ms <- NULL
+infoclustersc2
+```
+
