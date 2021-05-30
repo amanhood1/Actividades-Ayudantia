@@ -1,0 +1,258 @@
+---
+title: "Actividad Ayudantia 8"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Actividad Ayudantía 8: Entrega 28/05
+
+# Objetivo
+
+Para esta actividad tendrán que utilizar el csv que está subido de spotify o realizar ustedes un sample de la data del proyecto 2 de al menos 8000 observaciones.
+
+Para dicho dataset tendrán que realizar los tres modelos de clustering vistos en la ayudantía y tendrán que ejecutar 3 iteraciones del análisis mencionando que modificaron en cada iteración en la búsqueda de mejorar los clúster que se forman.
+
+## Carga de Librerías
+
+Se añaden a nuestro código las librerías a utilizar para los análisis que realizaremos.
+
+```{r}
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(mclust)
+library(readr)
+library(dbscan)
+library(e1071)
+library(mclust)
+```
+
+## Cargar Datos Actividad
+```{r}
+load("beats.RData")
+```
+
+## Preprocesamiento de los datos
+
+### Selección de variables de interés
+
+```{r}
+mus1 <- beats[, c(1,8:19, 23, 27)]
+summary(mus1)
+nrow(mus1)
+```
+
+### Limpieza de datos NA
+
+Al hacer el resumen de nuestra tabla filtrada, podemos ver que no existen datos que sean NA en las variables seleccionadas. Por ende se prosigue con el analisis para eliminar los elementos que se encuentren duplicados.
+
+### Limpieza de datos duplicados
+
+```{r}
+mus_uni <- mus1[!duplicated(mus1$track_id),]
+nrow(mus1) - nrow(mus_uni)
+```
+
+```{r}
+summary(mus_uni)
+```
+
+## Conversión de tipo de datos
+
+Podemos ver en el resumen de mus_uni, que existen diversos tipos de datos. Por este motivo procederemos a unficarlos tanto en double (para los que son numéricos) y character para aquellos que sean palabras, de esta manera no tendremos inconvenientes por el tipo de dato al realizar los análisis.
+
+```{r}
+mus_uni$danceability <- as.double(as.character(mus_uni$danceability))
+mus_uni$energy <- as.double(as.character(mus_uni$energy))
+mus_uni$key <- as.double(as.character(mus_uni$key))
+mus_uni$loudness <- as.double(as.character(mus_uni$loudness))
+mus_uni$mode <- as.double(as.character(mus_uni$mode))
+mus_uni$speechiness <- as.double(as.character(mus_uni$speechiness)) 
+mus_uni$acousticness <- as.double(as.character(mus_uni$acousticness))
+mus_uni$instrumentalness <- as.double(as.character(mus_uni$instrumentalness))
+mus_uni$liveness <- as.double(as.character(mus_uni$liveness))
+mus_uni$valence <- as.double(as.character(mus_uni$valence))
+mus_uni$tempo <- as.double(as.character(mus_uni$tempo))
+mus_uni$duration_ms <- as.double(as.character(mus_uni$duration_ms))
+```
+
+Asimismo, realizamos este procedimiento para las varibales que son de tipo character para volver a convertirlas, en el mismo tipo de dato, que es character. Y luego se realiza un summary para verificar que no haya quedado alguna variable NA, luego de realizar las conversiones de tipo de datos.
+
+```{r transformar variables chars}
+mus_uni$track_id <- as.character(mus_uni$track_id)
+mus_uni$track_name <- as.character(mus_uni$track_name)
+mus_uni$artist_name <- as.character(mus_uni$artist_name)
+summary(mus_uni)
+```
+
+## Muestreo Aleatorio
+
+```{r}
+set.seed(1000)
+mus_muest <- mus_uni[sample(nrow(mus_uni), 8000),]
+summary(mus_muest)
+```
+
+## Escalamiento de los Datos
+
+Luego en este punto se procede a escalar la data. El sentido de esto es poder trabajar en medidas que sean mas pequeñas y que por ende, permitan que los analisis sean mas sencillos. Es por esto que lo primero que se debe hacer es separar las variables que sean numericas de las caracteres, en la base de datos de la muestra.
+
+```{r}
+songs_char <- mus_muest %>% 
+  select(c("artist_name", "track_id", "track_name"))
+songs_num <- mus_muest %>%
+  select(c("key", "danceability", "energy", "loudness", "mode", "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo", "duration_ms"))
+```
+
+```{r}
+mus_scale <- data.frame(sapply(songs_num, scale))
+```
+
+A continuación se procede a revisar que la data escalada no tenga valores que sean NA, ya que como se hizo este proceso quizás algún dato fue emitido. Seria extraño, pero no esta nunca de más revisar. En caso de existir, estos son retirados.
+
+```{r}
+summary(mus_scale)
+```
+
+
+
+# DBSCAN
+Primer método, clustering basado en densidad
+
+```{r, warning = FALSE, message = FALSE}
+
+modelo_1 = dbscan(mus_scale, eps = 2, minPts = 10)
+modelo_1
+```
+El modelo genera 5 clúster, basado en los parámetros que le entregamos a la función dbscan.
+
+```{r}
+ggplot(mus_scale, aes(danceability, energy, color = factor(modelo_1$cluster), size = danceability)) + geom_point(alpha = 0.3) 
+```
+
+# Fuzzy C Means
+
+Se le va a pedir la misma cantidad de clúster que el modelo anterior (3) y un fusificador de 2 tal como se vio en la ayudantía. 
+
+```{r}
+modelo_2 <- cmeans(mus_scale, 3, m=5) 
+modelo_2$membership %>% head()
+```
+
+El algoritmo cmeans asigna como clúster al que tenga mayor probabilidad. El primer parámetro corresponde a la cantidad de clúster deseados.
+Al aumentar el fusificador, se observan pequeños cambios en las probabilidades entregadas, pero no corresponden a cambios significativos. 
+
+Otros algoritmos como el c-means permiten asignarle un clúster a todos los puntos
+
+```{r}
+ggplot(mus_scale, aes(danceability, energy, color = factor(modelo_2$cluster), size = danceability)) + geom_point(alpha = 0.3) 
+```
+
+Se pueden observar de manera más concreta los diferentes clúster obtenidos, pero de igual manera un clúster de baja relevancia queda oculto entre los otros dos. 
+
+Para los modelos de clustering difuso podemos calcular el Coeficiente de partición difusa (FPC)  
+
+```{r}
+matriz <- modelo_2$membership%*%t(modelo_2$membership) 
+(FPC <- sum(matriz*diag(nrow(matriz)))/nrow(matriz))
+```
+
+El valor del FPC es bajo, lo que significa que los grupos tienen alta variabilidad, y se puede confirmar en la figura, ya que no se ven grupos definidos.
+
+# GMM
+
+GMM permiten obtener clúster difusos utilizando modelos probabilísticos
+
+```{r}
+model_3 = Mclust(mus_scale)
+model_3 
+summary(model_3, parameters = TRUE)
+```
+
+```{r}
+ggplot(mus_scale) + aes(x=danceability, y=energy, color=factor(model_3$classification)) +geom_point(alpha=1)
+```
+
+```{r}
+fviz_cluster(model_3, mus_scale, stand = FALSE, frame = FALSE,geom = "point")
+```
+
+# BIC
+
+```{r}
+plot(model_3, what = "BIC")
+```
+
+# Segundo Intento: Eliminar columnas del dataset 
+
+Retire la duración y mode, ya que bajo mi concepción no representan informacion importante para este analisis. 
+
+```{r}
+data_escalada_2= mus_scale[,c(1:4,6:11 )]
+```
+
+# DBSCAN
+Primer método, clustering basado en densidad
+
+```{r, warning = FALSE, message = FALSE}
+modelo_1_2 = dbscan(data_escalada_2, eps = 2, minPts = 6)
+modelo_1_2
+```
+
+El modelo genera 6 clusters, basado en los parámetros que le entregamos a la función dbscan. Diminuyó el ruido, pero la mayoría de los datos se agruparon en el clúster 1. 
+
+```{r}
+ggplot(data_escalada_2, aes(danceability, energy, color = factor(modelo_1_2$cluster), size = danceability)) + geom_point(alpha = 0.3) 
+```
+
+Se puede ver que hay diversos puntos que no quedan asignados a ningún clúster dados los valores escogidos para la distancia mínima y además, a pesar de que no hay ruido, el clúster 1 concentra casi la totalidad de los datos.  
+
+Otros algoritmos como el c-means permiten asignarle un clúster a todos los puntos
+
+# Fuzzy C Means
+
+```{r}
+modelo_2_2 <- cmeans(data_escalada_2,  4,m=1.5) 
+modelo_2_2$membership %>% head()
+```
+
+El algoritmo cmeans asigna como clúster al que tenga mayor probabilidad
+
+```{r}
+ggplot(data_escalada_2, aes(danceability, energy, color = factor(modelo_2_2$cluster), size = danceability)) + geom_point(alpha = 0.3) 
+```
+
+Para los modelos de clustering difuso podemos calcular el Coeficiente de partición difusa (FPC) 
+
+```{r}
+matriz_2 <- modelo_2_2$membership%*%t(modelo_2_2$membership) 
+(FPC <- sum(matriz*diag(nrow(matriz)))/nrow(matriz))
+```
+No se evidencia mejora con respecto a la iteración que mantenía todas las variables. 
+
+# GMM
+
+GMM permiten obtener clúster difusos pero utilizando modelos probabilísticos
+
+```{r}
+model_3_2 = Mclust(data_escalada_2)
+model_3_2
+summary(model_3_2, parameters = TRUE)
+```
+
+```{r}
+ggplot(data_escalada_2) + aes(x=danceability, y=energy, color=factor(model_3_2$classification)) +geom_point(alpha=1)
+```
+
+```{r}
+fviz_cluster(model_3_2, data_escalada_2, stand = FALSE, frame = FALSE,geom = "point")
+```
+
+# BIC
+
+```{r}
+plot(model_3_2, what = "BIC")
+```
