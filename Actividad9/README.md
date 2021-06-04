@@ -568,10 +568,106 @@ La curva ROC muestra un valor de 50%, lo cual indica una explicación que
 deja bastante desear, ya que nos interesaría que este valor estuviese
 cercano a algo como 70%
 
+## Regresión Logistica Simple: predecir Calidad por la cantidad de alcohol
+
+Para mejorar nuestro modelo utilizaremos otra variable, en este caso
+será la de cantidad de alcohol, para verificar si es que esta logra de
+alguna manera explicar la calidad del vino.
+
+``` r
+set.seed(369)
+summary(wine)
+```
+
+    ##  fixed.acidity   volatile.acidity  citric.acid    residual.sugar  
+    ##  Min.   : 4.60   Min.   :0.1200   Min.   :0.000   Min.   : 0.900  
+    ##  1st Qu.: 7.10   1st Qu.:0.3900   1st Qu.:0.090   1st Qu.: 1.900  
+    ##  Median : 7.90   Median :0.5200   Median :0.260   Median : 2.200  
+    ##  Mean   : 8.32   Mean   :0.5278   Mean   :0.271   Mean   : 2.539  
+    ##  3rd Qu.: 9.20   3rd Qu.:0.6400   3rd Qu.:0.420   3rd Qu.: 2.600  
+    ##  Max.   :15.90   Max.   :1.5800   Max.   :1.000   Max.   :15.500  
+    ##    chlorides       free.sulfur.dioxide total.sulfur.dioxide    density      
+    ##  Min.   :0.01200   Min.   : 1.00       Min.   :  6.00       Min.   :0.9901  
+    ##  1st Qu.:0.07000   1st Qu.: 7.00       1st Qu.: 22.00       1st Qu.:0.9956  
+    ##  Median :0.07900   Median :14.00       Median : 38.00       Median :0.9968  
+    ##  Mean   :0.08747   Mean   :15.87       Mean   : 46.47       Mean   :0.9967  
+    ##  3rd Qu.:0.09000   3rd Qu.:21.00       3rd Qu.: 62.00       3rd Qu.:0.9978  
+    ##  Max.   :0.61100   Max.   :72.00       Max.   :289.00       Max.   :1.0037  
+    ##        pH          sulphates         alcohol         quality     
+    ##  Min.   :2.740   Min.   :0.3300   Min.   : 8.40   Min.   :3.000  
+    ##  1st Qu.:3.210   1st Qu.:0.5500   1st Qu.: 9.50   1st Qu.:5.000  
+    ##  Median :3.310   Median :0.6200   Median :10.20   Median :6.000  
+    ##  Mean   :3.311   Mean   :0.6581   Mean   :10.42   Mean   :5.636  
+    ##  3rd Qu.:3.400   3rd Qu.:0.7300   3rd Qu.:11.10   3rd Qu.:6.000  
+    ##  Max.   :4.010   Max.   :2.0000   Max.   :14.90   Max.   :8.000  
+    ##    quality_01          prob       
+    ##  Min.   :0.0000   Min.   :0.5273  
+    ##  1st Qu.:0.0000   1st Qu.:0.5338  
+    ##  Median :1.0000   Median :0.5347  
+    ##  Mean   :0.5347   Mean   :0.5347  
+    ##  3rd Qu.:1.0000   3rd Qu.:0.5358  
+    ##  Max.   :1.0000   Max.   :0.5407
+
+``` r
+glm.fit <- glm(quality_01 ~ alcohol, data = wine , family = "binomial")
+summary(glm.fit)
+```
+
+    ## 
+    ## Call:
+    ## glm(formula = quality_01 ~ alcohol, family = "binomial", data = wine)
+    ## 
+    ## Deviance Residuals: 
+    ##     Min       1Q   Median       3Q      Max  
+    ## -3.1535  -0.9243   0.3901   0.9615   2.0179  
+    ## 
+    ## Coefficients:
+    ##              Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept) -10.76302    0.68326  -15.75   <2e-16 ***
+    ## alcohol       1.05559    0.06663   15.84   <2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## (Dispersion parameter for binomial family taken to be 1)
+    ## 
+    ##     Null deviance: 2209  on 1598  degrees of freedom
+    ## Residual deviance: 1865  on 1597  degrees of freedom
+    ## AIC: 1869
+    ## 
+    ## Number of Fisher Scoring iterations: 4
+
+## Curva ROC
+
+``` r
+prob <- predict(glm.fit, type = c("response"))
+wine$prob <- prob
+curva_roc <- roc(quality_01 ~ prob, data = wine)
+```
+
+    ## Setting levels: control = 0, case = 1
+
+    ## Setting direction: controls < cases
+
+``` r
+plot(curva_roc)
+```
+
+![](Actividad-9_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
+``` r
+auc(curva_roc)
+```
+
+    ## Area under the curve: 0.7566
+
+Podemos apreciar que nuestra predicción mejora mucho en comparación a la
+anterior, cuando utilizamos la variable del pH. Ya que el modelo se
+explica en un 76%, según la variable alcohol.
+
 ## Regresión Logistica Multiple para predecir Calidad desde todas las variables restantes
 
-Para mejorar, o intentarlo, utilizaremos el resto de variables presentes
-en la base de datos.
+Para mejorar la predicción del modelo, o intentarlo, utilizaremos el
+resto de variables presentes en la base de datos.
 
 ``` r
 wine$prob <- NULL
@@ -628,7 +724,7 @@ curva_roc_multi <- roc(quality_01 ~ prob_multi, data = wine)
 plot(curva_roc_multi)
 ```
 
-![](Actividad-9_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](Actividad-9_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 ``` r
 auc(curva_roc_multi)
@@ -697,3 +793,14 @@ auc(roc(quality_01 ~ prob_multi, data = test_data))
 
 La predicción mejora dado que el modelo se explica en un 85%, lo cual es
 mejor que lo anterior.
+
+# Conclusión
+
+Finalmente, podemos determinar que a primera vista escoger una variable
+como el pH para determinar el precio de un vino, no parece ser una buena
+idea, ya que si bien quizás tenga alguna relación con su calidad esta no
+es suficiente como para concluir algo respecto de que tan bueno es.
+
+Por ende, es necesario usar otra variable, que en este caso podría ser
+el alcohol. El cual si refleja una fuerte relación con la calidad del
+vino.

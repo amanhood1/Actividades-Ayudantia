@@ -39,6 +39,7 @@ summary(toyota)
 
 Al aplicar la función "summary" podemos corroborar que ninguna base de datos tiene valores faltantes, por ende, se procede con la actividad.
 
+
 # Regresion Lineal con database Toyota
 
 Lo que buscamos en esta primera actividad, es predecir el precio al que venderíamos nuestro auto en caso de que este fuese un Toyota. 
@@ -135,6 +136,7 @@ VIF(reg_mult)
 
 Los valores referentes al estudio del VIF no presentan multicolinealidad, ya que son menores a 0,25. Por ende, se concluye este modelo.
 
+
 # Regresion Logistica con data de Vinos
 
 Lo que buscamos en esta segunda actividad, es predecir calidad del vino a partir de características propias de este producto.
@@ -202,6 +204,7 @@ summary(glm.fit)
 ```
 
 ## Curva ROC
+
 ```{r}
 prob <- predict(glm.fit, type = c("response"))
 wine$prob <- prob
@@ -212,9 +215,31 @@ auc(curva_roc)
 
 La curva ROC muestra un valor de 50%, lo cual indica una explicación que deja bastante desear, ya que nos interesaría que este valor estuviese cercano a algo como 70%
 
+## Regresión Logistica Simple: predecir Calidad por la cantidad de alcohol
+
+Para mejorar nuestro modelo utilizaremos otra variable, en este caso será la de cantidad de alcohol, para verificar si es que esta logra de alguna manera explicar la calidad del vino.
+
+```{r}
+set.seed(369)
+summary(wine)
+glm.fit <- glm(quality_01 ~ alcohol, data = wine , family = "binomial")
+summary(glm.fit)
+```
+
+## Curva ROC
+```{r}
+prob <- predict(glm.fit, type = c("response"))
+wine$prob <- prob
+curva_roc <- roc(quality_01 ~ prob, data = wine)
+plot(curva_roc)
+auc(curva_roc)
+```
+
+Podemos apreciar que nuestra predicción mejora mucho en comparación a la anterior, cuando utilizamos la variable del pH. Ya que el modelo se explica en un 76%, según la variable alcohol.
+
 ## Regresión Logistica Multiple para predecir Calidad desde todas las variables restantes
 
-Para mejorar, o intentarlo, utilizaremos el resto de variables presentes en la base de datos.
+Para mejorar la predicción del modelo, o intentarlo, utilizaremos el resto de variables presentes en la base de datos.
 
 ```{r}
 wine$prob <- NULL
@@ -249,3 +274,9 @@ auc(roc(quality_01 ~ prob_multi, data = test_data))
 ```
 
 La predicción mejora dado que el modelo se explica en un 85%, lo cual es mejor que lo anterior.
+
+# Conclusión
+
+Finalmente, podemos determinar que a primera vista escoger una variable como el pH para determinar el precio de un vino, no parece ser una buena idea, ya que si bien quizás tenga alguna relación con su calidad esta no es suficiente como para concluir algo respecto de que tan bueno es. 
+
+Por ende, es necesario usar otra variable, que en este caso podría ser el alcohol. El cual si refleja una fuerte relación con la calidad del vino. 
