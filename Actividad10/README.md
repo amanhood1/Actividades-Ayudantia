@@ -33,8 +33,6 @@ base de datos en una variable.
 ``` r
 setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad10")
 credit_card <- read.csv("UCI_Credit_Card.csv", sep = ",")
-#View(credit_card)
-#attach(credit_card)
 ```
 
 ## Limpieza de datos
