@@ -1,0 +1,102 @@
+---
+title: "Actividad Ayudantia 10"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Objetivo
+
+Para esta ayudantia tendran que realizar el metodo de analisis bayesiano para el data set de tarjetas de credito (dentro del bloc de notas podran encontrar el link que la explicacion de las variables del data set). El objetivo para ese data set es determinar si la persona fallara o no en el pago de su credito a partir de las variables del dataset
+
+## Importar Librerías
+
+Estas son las librerías necesarias para trabajar en la actividad de esta ayudantía.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(e1071)
+library(caret)
+library(rstan)
+library(rstanarm)
+library(pROC)
+library(ROCR)
+```
+
+## Cargar Datos
+
+Luego debemos cargar los datos necesarios para poder trabajar. En donde primero establecemos nuestro directorio de trabajo y luego cargar la base de datos en una variable.
+
+```{r}
+setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad10")
+credit_card <- read.csv("UCI_Credit_Card.csv", sep = ",")
+#View(credit_card)
+#attach(credit_card)
+```
+
+## Limpieza de datos
+
+En este punto tenemos que realizar la limpieza de datos, para poder trabajar de manera correcta sin tener ningun tipo de inconvenientes por alguna situación de la base de datos.
+
+### Búsqueda de datos faltantes
+
+Lo primero que debemos hacer es revisar si existen datos faltantes en nuestra base de datos, esto es si tienen el valor de NA. 
+
+Para esto utilizamos la función summary de R base y verificamos si es que hay datos NA.
+
+```{r}
+summary(credit_card)
+```
+
+Al observar el resultado de la funcion summary podemos verificar que no hay datos faltantes, por ende podemos empezar con los análisis asignados para esta actividad.
+
+# Modelo Batesiano 
+
+## Eliminar filas que no se van a utilizar
+
+Segun lo visto en la ayudantía, procederé primero a eliminar aquellas variables que no aportarán para nuestro análisis. Estas son las que son de status de pago y el monto de pago.
+
+```{r}
+credit_card$LIMIT_BAL = NULL
+credit_card$BILL_AMT1 = NULL
+credit_card$BILL_AMT2 = NULL
+credit_card$BILL_AMT3 = NULL
+credit_card$BILL_AMT4 = NULL
+credit_card$BILL_AMT5 = NULL
+credit_card$BILL_AMT6 = NULL
+credit_card$PAY_AMT1 = NULL
+credit_card$PAY_AMT2 = NULL
+credit_card$PAY_AMT3 = NULL
+credit_card$PAY_AMT4 = NULL
+credit_card$PAY_AMT5 = NULL
+credit_card$PAY_AMT6 = NULL
+```
+
+```{r}
+modeloNB<- naiveBayes(default.payment.next.month ~ ., data = credit_card)
+pred <- predict(modeloNB, credit_card, type ="raw")
+modeloNB
+```
+
+Ahora, se evaluará realizar lo mismo pero desde el modelo visto en ayudantia. 
+
+```{r}
+creditlinear <- stan_glm(default.payment.next.month ~ ., data = credit_card, family = gaussian)
+model_nb <- naiveBayes(default.payment.next.month ~ ., credit_card, laplace=1)
+pred_nb <- predict(model_nb, newdata = credit_card)
+```
+
+## Evaluación del modelo
+
+Calculamos el AUC para evaluar la capacidad del modelo de predecir.
+
+```{r}
+credit_card$prob <- pred[,2]
+curva_roc <- roc(default.payment.next.month ~ prob, data = credit_card)
+plot(curva_roc)    
+auc(curva_roc)
+```
+
+Podemos ver que el valor del AUC es de 74%, si bien no se encuentra en un rango tan alto, obtuvimos un valor que se acerca bastante a 1. Por ende, el modelo predice de buena manera.
