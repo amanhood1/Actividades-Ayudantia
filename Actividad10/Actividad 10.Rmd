@@ -74,18 +74,12 @@ credit_card$PAY_AMT5 = NULL
 credit_card$PAY_AMT6 = NULL
 ```
 
+Ahora se realizará el análisis segun bayes, a partir de lo visto en clases.
+
 ```{r}
 modeloNB<- naiveBayes(default.payment.next.month ~ ., data = credit_card)
 pred <- predict(modeloNB, credit_card, type ="raw")
 modeloNB
-```
-
-Ahora, se evaluará realizar lo mismo pero desde el modelo visto en ayudantia. 
-
-```{r}
-creditlinear <- stan_glm(default.payment.next.month ~ ., data = credit_card, family = gaussian)
-model_nb <- naiveBayes(default.payment.next.month ~ ., credit_card, laplace=1)
-pred_nb <- predict(model_nb, newdata = credit_card)
 ```
 
 ## Evaluación del modelo
