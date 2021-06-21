@@ -1,0 +1,173 @@
+---
+title: "Ayudantía 11"
+output: github_document
+author: Alejandro Manhood
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Actividad Ayudantía N°11
+
+- Para la actividad de esta ayudantía realizarán el análisis de árbol de decisión a partir de alguno de los dos data sets que quedaron subidos. Para el caso de Credit Card el objetivo será clasificar si el cliente va a pagar o no el credito que adeuda. Mientras para el caso de Hotel Bookings el objetivo será determinar si la reserva del hotel será o no cancelada. (Comparen los resultados obtenidos mediante árboles de decisión con los modelos de regresión logística, naive bayes y KNN)
+
+## Cargamos las librerías
+
+Cargamos las librerías que seran utilizadas para esta actividad.
+
+```{r cargando librerias, message=FALSE}
+library(plyr)
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(discrim)
+library(caret)
+library(pROC)
+library(ROCR)
+library(e1071)
+library(naivebayes)
+```
+
+## Cargar Datos
+
+Luego debemos cargar los datos necesarios para poder trabajar. En donde primero establecemos nuestro directorio de trabajo y luego cargar la base de datos en una variable.
+
+```{r}
+setwd("C:/Users/amanh/OneDrive/Documentos/GitHub/Actividades-Ayudantia/Actividad11")
+credit_card <- read.csv("UCI_Credit_Card.csv", sep = ",")
+```
+
+Luego de esto se escala la data para que de esta manera no hayan problemas por alguna diferencia de magnitud en los valores.
+
+```{r}
+creditScale <- credit_card 
+creditScale <- data.frame(scale(creditScale))
+creditScale$default.payment.next.month <- rescale(creditScale$default.payment.next.month)
+```
+
+Teniendo esta data escalada, se procede a separar el data set en dos nuevos, para de esta manera tener uno que sera para entrenar y otro para testear.
+
+```{r}
+creditSplit <- initial_split(credit_card,
+                             prop = 0.7,
+                             strata = NULL)
+creditTrain <- training(creditSplit) %>% as.data.frame() 
+creditTest <- testing(creditSplit) %>% as.data.frame()
+```
+
+
+## Pre Procesamiento de los datos
+
+Antes de comenzar el análisis, es necesario hacer una limpieza de la data para sacar todos los valores que sean NA. De esta manera evitaremos problemas al momento de realizar los análisis futuros de este trabajo.
+
+Esto se revisará con la función summary.
+
+```{r}
+summary(creditTrain)
+summary(creditTest)
+```
+
+Podemos apreciar que los dos datasets estan libres de datos NA, por ende, es posible comenzar con los análisis pertinentes. Por otra parte, se tomo la decisión de eliminar la variable ID, ya que esta no aporta valor al momento de los análisis.
+
+```{r}
+creditTest$ID <- NULL
+creditTrain$ID <- NULL
+```
+
+## Crear modelo
+
+Primero es necesario crear la receta para el modelo.
+
+```{r}
+receta <- 
+  recipe(default.payment.next.month ~ ., data = creditTrain)
+receta
+```
+
+Luego ya se puede crear el modelo del árbol de decisión.
+
+```{r}
+modeloTrees <-
+  decision_tree(tree_depth = 5, min_n = 10) %>% 
+  set_engine("rpart") %>% 
+  set_mode("classification")
+modeloTrees
+```
+
+Luego es necesario realizar el fit del modelo, calculando sus predicciones y su AUC.
+
+```{r fit modelo}
+fitModel <- function(modelo){
+  
+  modeloFit <- 
+  workflow() %>% 
+  add_model(modelo) %>% 
+  add_recipe(receta) %>% 
+  fit(data = creditTrain)
+modelPredictor <- 
+  predict(modeloFit, creditTest, type = "prob") %>% 
+  bind_cols(creditTest) 
+return(modelPredictor %>% 
+  roc_auc(truth = default.payment.next.month , .pred_0))
+}
+```
+
+## Regresión Logística
+
+A continuacion se realizara una regresión logistica
+
+```{r}
+library(rstanarm)
+modeloRegLog <- glm(default.payment.next.month ~ ., data = creditScale , family = "binomial")
+prob <- predict(modeloRegLog, type = c("response"), )
+creditScale$prob <- prob
+curvaROC <- roc(default.payment.next.month ~ prob, data = credit_card)
+plot(curvaROC)
+auc(curvaROC)
+creditTrain$prob <- NULL
+```
+
+Este modelo entrega un área bajo la curva de 0.7342, lo que si bien es un porcentaje alto de explicación, sería mejor que este valor fuese más alto, para que así elmodelo explicara de mejor manera si el cliente pagara o no el credito que debe.
+
+## Naive Bayes
+
+se procede a realizar el modelo de Naive Bayes. Junto con su curva ROC y AUC
+
+```{r}
+modeloNaiveBayes <- naiveBayes(default.payment.next.month ~  AGE + SEX + as.factor(EDUCATION) + as.factor(MARRIAGE) + LIMIT_BAL +
+                                PAY_0 + PAY_2 + PAY_3 + PAY_4 + PAY_5 + PAY_6 + 
+                                BILL_AMT1 + BILL_AMT2 + BILL_AMT3 + BILL_AMT4 + BILL_AMT5 + BILL_AMT6 +
+                                PAY_AMT1 + PAY_AMT2 + PAY_AMT3 + PAY_AMT4 + PAY_AMT5 + PAY_AMT6, creditTrain, laplace=1)
+modelPredictionTest <- predict(modeloNaiveBayes, newdata = creditTest, type="raw")
+predictionNB <- prediction(modelPredictionTest[,2], creditTest$default.payment.next.month)
+performanceNB <- performance(predictionNB, "tpr", "fpr")
+plot(performanceNB, colorize = T)
+performance(predictionNB, "auc")@y.values
+```
+
+Como se puede ver, el valor del área bajo la curva corresponde a 0.7448, lo cual es bastante cercano a lo obtenido con el modelo de regresión logística.
+
+## KNN
+
+Para el modelo KNN se utilizará un K igual a 100. Además, se utiliza la funcion accuracy para determinar la precision de nuestro modelo.
+
+```{r modelo KNN}
+library(class)
+set.seed(123)
+modeloKNN <- knn(creditTrain, creditTest, cl = creditTrain$default.payment.next.month, k = 100)
+defaultPayments <- creditTest[,24]
+tablaKNN <- table(modeloKNN, defaultPayments)
+accuracy(tablaKNN)
+```
+
+Así, el modelo KNN obtenido entrega una precisión de un 78.22%, lo que es mayor a lo obtenido con los modelos anteriores que rondaban un 73 - 74%.
+
+```{r plot tree ,fig.width=15, fig.height=8}
+library(rpart)
+library(rpart.plot)
+arbol <- rpart( default.payment.next.month ~., data = creditTest, method = "class")
+rpart.plot(arbol)
+```
+
+Teniendo en cuenta que la variable PAY_0 indica los meses de retraso de los clientes, se puede interpretar que aquellos clientes que tengan a lo más 1 mes de retraso en sus pagos no caerán en default con una probabilidad de un 89%, mientras que aquellos clientes con 2 o más meses de retraso en sus pagos tendrán tan solo un 11% de probabilidad de no pagar.
